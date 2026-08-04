@@ -9,6 +9,8 @@ on:
 jobs:
   run-checker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Gitのコミットとプッシュを行うために必要
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,3 +36,11 @@ jobs:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
         run: |
           python main.py
+
+      - name: Commit and push state changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          # 変更がある場合のみコミットしてプッシュする
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update state.json [skip ci]" && git push)
