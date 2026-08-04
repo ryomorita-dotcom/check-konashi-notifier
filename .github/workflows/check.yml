@@ -22,14 +22,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # Playwrightのブラウザをインストール
-          playwright install --with-deps chromium
+          # PlaywrightのブラウザをPython経由でインストールする
+          python -m playwright install --with-deps chromium
 
       - name: Run reservation checker
         env:
-          # GitHubのSecretsから環境変数を渡す (キー名は自分のSecretsに合わせて変更してな)
+          # GitHubのSecretsから環境変数を渡す
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
         run: |
-          python main.py  # ← 実行するPythonファイル名に変えてな
-
+          python main.py
