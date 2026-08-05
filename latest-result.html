@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>予約空室チェッカー 結果</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 15px;
+            color: #333;
+            background-color: #f9f9f9;
+            display: inline-block;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        table {
+            width: auto;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 6px 12px;
+            text-align: center;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f1f8ff;
+            font-weight: 600;
+        }
+        td.room-name {
+            text-align: left;
+            font-weight: 500;
+            background-color: #fcfcfc;
+        }
+        .status-maru {
+            color: #d73a49;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .status-sankaku {
+            color: #e36209;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .status-batsu {
+            color: #6a737d;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .status-dash {
+            color: #dfe2e5;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .section-title {
+            font-size: 1rem;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 3px;
+            font-weight: bold;
+        }
+        ul {
+            padding-left: 20px;
+            font-size: 0.85rem;
+            margin: 5px 0;
+        }
+        li {
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>キャンプ場 予約空室状況</h1>
+    <div class="meta">
+        <strong>最終更新:</strong> 2026-08-05 16:40 (JST) / 
+        <strong>対象日:</strong> 8/8, 8/9, 8/10, 8/13, 8/14, 8/15
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ルーム名 \ 日付</th>
+                <th>8/8</th><th>8/9</th><th>8/10</th><th>8/13</th><th>8/14</th><th>8/15</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="room-name">A型ケビン ２階建て</td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td></tr>
+<tr><td class="room-name">A型ケビン 平屋建て</td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td></tr>
+<tr><td class="room-name">D型ケビン</td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td></tr>
+<tr><td class="room-name">B型ケビン</td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td><td><span class="status-batsu">×</span></td></tr>
+
+        </tbody>
+    </table>
+
+    <div class="section-title">📅 日付ごとの空室状況</div>
+    <table>
+        <thead>
+            <tr>
+                <th>日付</th>
+                <th>状態</th>
+                <th>空室ルーム</th>
+            </tr>
+        </thead>
+        <tbody>
+            
+            <tr>
+                <td>8/8</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td>8/9</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td>8/10</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td>8/13</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td>8/14</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td>8/15</td>
+                <td><span class="status-batsu">空室なし</span></td>
+                <td>-</td>
+            </tr>
+        
+        </tbody>
+    </table>
+
+    <div class="section-title">🔔 通知ログ</div>
+    <ul>
+        <li>新規の通知対象はありませんでした。</li>
+
+    </ul>
+
+</body>
+</html>
