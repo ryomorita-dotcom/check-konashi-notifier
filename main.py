@@ -59,7 +59,16 @@ def notify_pushover(message: str):
 
 
 # ============================
-#  state.json 読み込み・保存
+#  config.json 読み込み
+# ============================
+
+def load_config():
+    with open("config.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ============================
+#  state.json 読み込み・保存・クレンジング
 # ============================
 
 STATE_FILE = "state.json"
@@ -80,6 +89,21 @@ def load_state():
 def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
+
+def clean_state(state, target_dates):
+    """
+    config.json の target_dates に含まれない古い日付のデータを state から削除する
+    """
+    cleaned = {}
+    for room, dates_dict in state.items():
+        cleaned_room_dict = {}
+        for date_str, status in dates_dict.items():
+            if date_str in target_dates:
+                cleaned_room_dict[date_str] = status
+        # 対象日のデータが1件でも残るルームのみ保持する
+        if cleaned_room_dict:
+            cleaned[room] = cleaned_room_dict
+    return cleaned
 
 
 # ============================
@@ -107,29 +131,8 @@ def update_state(room, date, status, state):
 
 
 # ============================
-#  config.json 読み込み
-# ============================
-
-def load_config():
-    with open("config.json", "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-# ============================
 #  日付処理
 # ============================
-
-def date_to_week_index(date_str):
-    month, day = map(int, date_str.split("/"))
-    base = datetime(2026, 8, 1)
-    target = datetime(2026, month, day)
-    delta_days = (target - base).days
-    return delta_days // 7 + 1
-
-def week_start_date(week_index):
-    base = datetime(2026, 8, 1)
-    start = base + timedelta(days=(week_index - 1) * 7)
-    return start.strftime("%Y%m%d")
 
 def parse_date_text(raw: str) -> str:
     raw = raw.strip()
@@ -143,6 +146,24 @@ def parse_date_text(raw: str) -> str:
             break
     return out
 
+def get_target_dates_week_indices(target_dates, base_date):
+    """
+    画面上の1週目初日（base_date: datetime型）を基準として、
+    各ターゲット日付が何週目（1始まり）にあたるかを計算し、その最大値を返す
+    """
+    max_w = 1
+    for d_str in target_dates:
+        m, d = map(int, d_str.split("/"))
+        target_dt = datetime(base_date.year, m, d)
+        if target_dt < base_date:
+            target_dt = datetime(base_date.year + 1, m, d)
+        
+        delta_days = (target_dt - base_date).days
+        week_idx = delta_days // 7 + 1
+        if week_idx > max_w:
+            max_w = week_idx
+    return max_w
+
 
 # ============================
 #  main
@@ -153,13 +174,14 @@ def main():
     TARGET_DATES = config["target_dates"]
     save_debug_html = config.get("save_debug_html", False)
 
-    max_week = max(date_to_week_index(d) for d in TARGET_DATES)
-
     print(f"予約対象日: {TARGET_DATES}")
-    print(f"{max_week} 週目までチェックします")
     print(f"環境判定: {ENV}")
 
+    # state の読み込みと不要な日付のクレンジング
     state = load_state()
+    state = clean_state(state, TARGET_DATES)
+    save_state(state)
+
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
     with sync_playwright() as p:
@@ -167,37 +189,64 @@ def main():
         page = browser.new_page(viewport={"width": 1920, "height": 1080})
         page.goto(TARGET_URL, wait_until="domcontentloaded")
 
+        # Week 1 の日付群を最初に取得して、動的な基準日（base_date）を決定する
+        try:
+            page.wait_for_selector(
+                "div.calendarBody_date_PC_inner p.calendarBody_date_PC_item",
+                timeout=5000
+            )
+        except:
+            pass
+
+        date_nodes = page.locator("div.calendarBody_date_PC_inner p.calendarBody_date_PC_item")
+        raw_dates = [node.inner_text() for node in date_nodes.all()]
+        dates = [parse_date_text(d) for d in raw_dates]
+
+        if len(dates) >= 1 and "/" in dates[0]:
+            m, d = map(int, dates[0].split("/"))
+            current_year = datetime.now().year
+            base_date = datetime(current_year, m, d)
+        else:
+            base_date = datetime(2026, 8, 1)
+
+        print(f"動的基準日 (Week 1 初日): {base_date.strftime('%Y/%m/%d')}")
+
+        # ターゲット日付から必要な最大週数を動的に算出
+        max_week = get_target_dates_week_indices(TARGET_DATES, base_date)
+        print(f"算出された最大週数 (max_week): {max_week} 週目までチェックします")
+
         found = []
 
         for week in range(1, max_week + 1):
 
             print(f"\n=== WEEK {week} ===")
 
-            try:
-                page.wait_for_selector(
-                    "div.calendarBody_date_PC_inner p.calendarBody_date_PC_item",
-                    timeout=5000
-                )
-            except:
-                pass
+            if week > 1:
+                try:
+                    page.wait_for_selector(
+                        "div.calendarBody_date_PC_inner p.calendarBody_date_PC_item",
+                        timeout=5000
+                    )
+                except:
+                    pass
 
-            date_nodes = page.locator("div.calendarBody_date_PC_inner p.calendarBody_date_PC_item")
-            raw_dates = [node.inner_text() for node in date_nodes.all()]
-            dates = [parse_date_text(d) for d in raw_dates]
+                date_nodes = page.locator("div.calendarBody_date_PC_inner p.calendarBody_date_PC_item")
+                raw_dates = [node.inner_text() for node in date_nodes.all()]
+                dates = [parse_date_text(d) for d in raw_dates]
 
             # 正常に7日分取得できた場合
             if len(dates) >= 7:
                 print("DATES:", dates)
             else:
-                # 取得しきれなかった場合の保険（補完ロジック）
                 if len(dates) >= 1 and "/" in dates[0]:
                     try:
                         m, d = map(int, dates[0].split("/"))
-                        start = datetime(2026, m, d)
+                        current_year = datetime.now().year
+                        start = datetime(current_year, m, d)
                     except:
-                        start = datetime(2026, 8, 1)
+                        start = base_date
                 else:
-                    start = datetime(2026, 8, 1)
+                    start = base_date
 
                 dates = [(start + timedelta(days=i)).strftime("%-m/%-d") for i in range(7)]
                 print("DATES (COMPLETED):", dates)
