@@ -222,17 +222,18 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 15px;
+            margin: 20px;
             color: #333;
             background-color: #f9f9f9;
             display: inline-block;
+            zoom: 1.2; /* 全体を約120%に拡大 */
         }}
         h1 {{
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             margin-bottom: 5px;
         }}
         .meta {{
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             color: #666;
             margin-bottom: 15px;
         }}
@@ -245,9 +246,9 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
         }}
         th, td {{
             border: 1px solid #e1e4e8;
-            padding: 6px 12px;
+            padding: 8px 14px;
             text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             white-space: nowrap;
         }}
         th {{
@@ -261,26 +262,26 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
         }}
         .status-maru {{
             color: #d73a49;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: bold;
         }}
         .status-sankaku {{
             color: #e36209;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: bold;
         }}
         .status-batsu {{
             color: #6a737d;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: bold;
         }}
         .status-dash {{
             color: #dfe2e5;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: bold;
         }}
         .section-title {{
-            font-size: 1rem;
+            font-size: 1.05rem;
             margin-top: 20px;
             margin-bottom: 8px;
             border-bottom: 2px solid #eaecef;
@@ -289,11 +290,31 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
         }}
         ul {{
             padding-left: 20px;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             margin: 5px 0;
         }}
         li {{
             margin-bottom: 3px;
+        }}
+        .action-container {{
+            margin-top: 10px;
+            margin-bottom: 15px;
+            text-align: left;
+        }}
+        .btn-reserve {{
+            display: inline-block;
+            background-color: #0366d6;
+            color: #ffffff;
+            padding: 9px 18px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            transition: background-color 0.2s;
+        }}
+        .btn-reserve:hover {{
+            background-color: #0056b3;
         }}
     </style>
 </head>
@@ -335,6 +356,13 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
     <ul>
         {logs_li}
     </ul>
+
+    <div class="section-title">🔗 予約ページ</div>
+    <div class="action-container">
+        <a href="{TARGET_URL}" target="_blank" class="btn-reserve">
+            公式予約ページを開く
+        </a>
+    </div>
 
 </body>
 </html>
