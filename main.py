@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
@@ -164,7 +164,9 @@ def get_target_dates_week_indices(target_dates, base_date):
 # ============================
 
 def generate_html_report(target_dates, room_order, room_data, date_availability, notification_logs):
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # JST（UTC+9）の現在時刻を取得
+    JST = timezone(timedelta(hours=9))
+    now_str = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     dates_meta = ", ".join(target_dates)
 
     th_dates_html = "".join([f"<th>{d}</th>" for d in target_dates])
@@ -299,7 +301,7 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
 
     <h1>キャンプ場 予約空室状況</h1>
     <div class="meta">
-        <strong>最終更新:</strong> {now_str} / 
+        <strong>最終更新:</strong> {now_str} (JST) / 
         <strong>対象日:</strong> {dates_meta}
     </div>
 
