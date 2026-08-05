@@ -295,17 +295,14 @@ def main():
 
                     if status in ["〇", "△"]:
                         if should_notify(name, target_date, status, state):
-                            print(f"--- 空きあり、通知未実施のため通知します")
-                            print(f"空き：あり")
-                            print(f"通知：あり（初回）")
-
+                            print(f"------> {target_date} {name} 空きあり、通知しました")
                             msg = f"{name} の {target_date} が空いてる ({status})"
                             found.append(msg)
                             notify_pushover(msg)
                         else:
-                            print(f"--- 空きあり、通知済みのため通知しません")
-                            print(f"空き：あり")
-                            print(f"通知：なし（通知済み）")
+                            print(f"------> {target_date} {name} 空きあり、通知済みのため通知しません")
+                    else:
+                        print(f"------> {target_date} {name} 空きなし")
 
                     update_state(name, target_date, status, state)
 
@@ -313,9 +310,6 @@ def main():
                 next_btn = page.locator("div.calendarBody_vacancy_next a").first
                 next_btn.click()
                 page.wait_for_timeout(1000)
-
-        if not found:
-            print("空きなし")
 
         browser.close()
 
