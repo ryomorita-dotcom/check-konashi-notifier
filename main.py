@@ -151,6 +151,7 @@ def parse_date_text(raw: str) -> str:
 def main():
     config = load_config()
     TARGET_DATES = config["target_dates"]
+    save_debug_html = config.get("save_debug_html", False)
 
     max_week = max(date_to_week_index(d) for d in TARGET_DATES)
 
@@ -159,6 +160,7 @@ def main():
     print(f"環境判定: {ENV}")
 
     state = load_state()
+    execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -183,23 +185,34 @@ def main():
             raw_dates = [node.inner_text() for node in date_nodes.all()]
             dates = [parse_date_text(d) for d in raw_dates]
 
-            print("DATES (PC):", dates)
-
-            if week == 1:
-                if len(dates) >= 1:
-                    m, d = map(int, dates[0].split("/"))
-                    start = datetime(2026, m, d)
+            # 正常に7日分取得できた場合
+            if len(dates) >= 7:
+                print("DATES:", dates)
+            else:
+                # 取得しきれなかった場合の保険（補完ロジック）
+                if len(dates) >= 1 and "/" in dates[0]:
+                    try:
+                        m, d = map(int, dates[0].split("/"))
+                        start = datetime(2026, m, d)
+                    except:
+                        start = datetime(2026, 8, 1)
                 else:
                     start = datetime(2026, 8, 1)
 
                 dates = [(start + timedelta(days=i)).strftime("%-m/%-d") for i in range(7)]
-                print("DATES (WEEK1 COMPLETED):", dates)
+                print("DATES (COMPLETED):", dates)
 
             date_index = {d: i for i, d in enumerate(dates)}
 
-            start_date = week_start_date(week)
-            with open(f"week_{start_date}.html", "w", encoding="utf-8") as f:
+            # デバッグ用HTMLの出力 ({実行日時}_week{X}.html)
+            debug_filename = f"{execution_time_str}_week{week}.html"
+            with open(debug_filename, "w", encoding="utf-8") as f:
                 f.write(page.content())
+
+            # 設定が false ならファイルはすぐに削除する
+            if not save_debug_html:
+                if os.path.exists(debug_filename):
+                    os.remove(debug_filename)
 
             rows = page.locator("div.calendarBody_roomList")
 
@@ -222,13 +235,11 @@ def main():
                 for target_date in TARGET_DATES:
                     idx = date_index.get(target_date)
 
-                    # ★ 対象日がその週に存在しない → ログ不要
                     if idx is None:
                         continue
 
                     status = statuses[idx]
 
-                    # ★ 空室ありの場合だけログを出す
                     if status in ["〇", "△"]:
                         if should_notify(name, target_date, status, state):
                             print(f"--- 空きあり、通知未実施のため通知します")
@@ -243,7 +254,6 @@ def main():
                             print(f"空き：あり")
                             print(f"通知：なし（通知済み）")
 
-                    # ★ 満室の場合はログ不要（あなたの意図）
                     update_state(name, target_date, status, state)
 
             if week < max_week:

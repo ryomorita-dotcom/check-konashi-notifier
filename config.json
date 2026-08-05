@@ -1,4 +1,5 @@
 {
-  "target_dates": ["8/7","8/21"],
-  "test_mode": true
+  "target_dates": ["8/7", "8/21"],
+  "test_mode": true,
+  "save_debug_html": true
 }
