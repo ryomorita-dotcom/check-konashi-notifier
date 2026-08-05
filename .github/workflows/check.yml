@@ -40,8 +40,16 @@ jobs:
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
-            # state.json、最新結果のテキスト、HTMLレポートをコミット対象にする
-            git add state.json latest-result.txt latest-result.html
+            # .gitignore に latest-result.html が確実に含まれているか確認・保証する
+            if ! grep -q "latest-result.html" .gitignore; then
+              echo "latest-result.html" >> .gitignore
+            fi
+            
+            # state.jsonと最新結果のテキストをコミット対象にする
+            git add state.json latest-result.txt
+            
+            # .gitignore に入っていても latest-result.html は強制的にコミット・公開対象に含める
+            git add -f latest-result.html
             
             # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
             SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")
