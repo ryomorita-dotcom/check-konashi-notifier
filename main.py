@@ -46,8 +46,6 @@ def notify_pushover(message: str):
         print("Pushover の環境変数が設定されていません (.env or GitHub Secrets を確認)")
         return
 
-    print(f"[{ENV}] 通知: {message}")
-
     requests.post(
         "https://api.pushover.net/1/messages.json",
         data={
@@ -100,7 +98,6 @@ def clean_state(state, target_dates):
         for date_str, status in dates_dict.items():
             if date_str in target_dates:
                 cleaned_room_dict[date_str] = status
-        # 対象日のデータが1件でも残るルームのみ保持する
         if cleaned_room_dict:
             cleaned[room] = cleaned_room_dict
     return cleaned
@@ -147,10 +144,6 @@ def parse_date_text(raw: str) -> str:
     return out
 
 def get_target_dates_week_indices(target_dates, base_date):
-    """
-    画面上の1週目初日（base_date: datetime型）を基準として、
-    各ターゲット日付が何週目（1始まり）にあたるかを計算し、その最大値を返す
-    """
     max_w = 1
     for d_str in target_dates:
         m, d = map(int, d_str.split("/"))
@@ -184,12 +177,16 @@ def main():
 
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
+    # ルームごとのデータを収集する辞書
+    # room_data[room_name][target_date] = status
+    room_data = {}
+    room_order = []
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1920, "height": 1080})
         page.goto(TARGET_URL, wait_until="domcontentloaded")
 
-        # Week 1 の日付群を最初に取得して、動的な基準日（base_date）を決定する
         try:
             page.wait_for_selector(
                 "div.calendarBody_date_PC_inner p.calendarBody_date_PC_item",
@@ -209,18 +206,9 @@ def main():
         else:
             base_date = datetime(2026, 8, 1)
 
-        print(f"動的基準日 (Week 1 初日): {base_date.strftime('%Y/%m/%d')}")
-
-        # ターゲット日付から必要な最大週数を動的に算出
         max_week = get_target_dates_week_indices(TARGET_DATES, base_date)
-        print(f"算出された最大週数 (max_week): {max_week} 週目までチェックします")
-
-        found = []
 
         for week in range(1, max_week + 1):
-
-            print(f"\n=== WEEK {week} ===")
-
             if week > 1:
                 try:
                     page.wait_for_selector(
@@ -234,10 +222,7 @@ def main():
                 raw_dates = [node.inner_text() for node in date_nodes.all()]
                 dates = [parse_date_text(d) for d in raw_dates]
 
-            # 正常に7日分取得できた場合
-            if len(dates) >= 7:
-                print("DATES:", dates)
-            else:
+            if len(dates) < 7:
                 if len(dates) >= 1 and "/" in dates[0]:
                     try:
                         m, d = map(int, dates[0].split("/"))
@@ -247,34 +232,31 @@ def main():
                         start = base_date
                 else:
                     start = base_date
-
                 dates = [(start + timedelta(days=i)).strftime("%-m/%-d") for i in range(7)]
-                print("DATES (COMPLETED):", dates)
 
             date_index = {d: i for i, d in enumerate(dates)}
 
-            # デバッグ用HTMLを保存する専用フォルダの作成
+            # デバッグ用HTML保存
             debug_dir = "debug_html"
             os.makedirs(debug_dir, exist_ok=True)
-
-            # デバッグ用HTMLの出力 (debug_html/{実行日時}_week{X}.html)
             debug_filename = os.path.join(debug_dir, f"{execution_time_str}_week{week}.html")
             with open(debug_filename, "w", encoding="utf-8") as f:
                 f.write(page.content())
-
-            # 設定が false ならファイルはすぐに削除する
-            if not save_debug_html:
-                if os.path.exists(debug_filename):
-                    os.remove(debug_filename)
+            if not save_debug_html and os.path.exists(debug_filename):
+                os.remove(debug_filename)
 
             rows = page.locator("div.calendarBody_roomList")
 
             for i in range(rows.count()):
                 row = rows.nth(i)
-
                 name = row.locator("p.calendarBody_room_name a").inner_text().strip()
                 if "持参テント" in name:
                     continue
+
+                if name not in room_order:
+                    room_order.append(name)
+                if name not in room_data:
+                    room_data[name] = {}
 
                 status_cells = row.locator("div.calendarBody_vacancy_date")
                 statuses = [
@@ -282,29 +264,12 @@ def main():
                     for j in range(status_cells.count())
                 ]
 
-                print(f"ROOM: {name}")
-                print("STATUSES:", statuses)
-
                 for target_date in TARGET_DATES:
                     idx = date_index.get(target_date)
-
-                    if idx is None:
-                        continue
-
-                    status = statuses[idx]
-
-                    if status in ["〇", "△"]:
-                        if should_notify(name, target_date, status, state):
-                            print(f"------> {target_date} {name} 空きあり、通知しました")
-                            msg = f"{name} の {target_date} が空いてる ({status})"
-                            found.append(msg)
-                            notify_pushover(msg)
-                        else:
-                            print(f"------> {target_date} {name} 空きあり、通知済みのため通知しません")
-                    else:
-                        print(f"------> {target_date} {name} 空きなし")
-
-                    update_state(name, target_date, status, state)
+                    if idx is not None and idx < len(statuses):
+                        # すでに他の週の走査で値が入っていなければ格納
+                        if target_date not in room_data[name]:
+                            room_data[name][target_date] = statuses[idx]
 
             if week < max_week:
                 next_btn = page.locator("div.calendarBody_vacancy_next a").first
@@ -312,6 +277,60 @@ def main():
                 page.wait_for_timeout(1000)
 
         browser.close()
+
+    # ============================
+    #  集計・判定・通知・出力
+    # ============================
+
+    # 1. [一覧] の表示
+    print("\n[一覧]")
+    dates_str = ", ".join([f"'{d}'" for d in TARGET_DATES])
+    print(f"日付: {dates_str}")
+    for room in room_order:
+        statuses_list = [room_data.get(room, {}).get(d, "-") for d in TARGET_DATES]
+        print(f"{room}: {','.join(statuses_list)}")
+
+    # 2. [日付ごと] の集計
+    print("\n[日付ごと]")
+    date_availability = {} # date: [available_rooms...]
+    for d in TARGET_DATES:
+        available_rooms = []
+        for room in room_order:
+            status = room_data.get(room, {}).get(d, "-")
+            if status in ["〇", "△"]:
+                available_rooms.append(room)
+        date_availability[d] = available_rooms
+
+        if available_rooms:
+            print(f"{d}: 空室あり ({', '.join(available_rooms)})")
+        else:
+            print(f"{d}: 空室なし")
+
+    # 3. [通知] の判定と実行
+    print("\n[通知]")
+    notification_logs = []
+
+    for d in TARGET_DATES:
+        available_rooms = date_availability.get(d, [])
+        for room in available_rooms:
+            status = room_data.get(room, {}).get(d)
+            if should_notify(room, d, status, state):
+                # 新規通知
+                msg = f"{room} の {d} が空いてる ({status})"
+                notify_pushover(msg)
+                notification_logs.append(f"{d} {room}: 通知あり (新規のため通知)")
+            else:
+                # 通知済み
+                notification_logs.append(f"{d} {room}: 通知なし (通知済み)")
+
+            # ステートを更新
+            update_state(room, d, status, state)
+
+    if notification_logs:
+        for log in notification_logs:
+            print(log)
+    else:
+        print("新規の通知対象はありませんでした。")
 
 
 if __name__ == "__main__":
