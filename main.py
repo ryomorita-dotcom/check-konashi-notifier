@@ -167,9 +167,6 @@ def main():
     TARGET_DATES = config["target_dates"]
     save_debug_html = config.get("save_debug_html", False)
 
-    print(f"予約対象日: {TARGET_DATES}")
-    print(f"環境判定: {ENV}")
-
     # state の読み込みと不要な日付のクレンジング
     state = load_state()
     state = clean_state(state, TARGET_DATES)
@@ -178,7 +175,6 @@ def main():
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
     # ルームごとのデータを収集する辞書
-    # room_data[room_name][target_date] = status
     room_data = {}
     room_order = []
 
@@ -267,7 +263,6 @@ def main():
                 for target_date in TARGET_DATES:
                     idx = date_index.get(target_date)
                     if idx is not None and idx < len(statuses):
-                        # すでに他の週の走査で値が入っていなければ格納
                         if target_date not in room_data[name]:
                             room_data[name][target_date] = statuses[idx]
 
@@ -279,20 +274,24 @@ def main():
         browser.close()
 
     # ============================
-    #  集計・判定・通知・出力
+    #  集計・判定・通知・出力文字列の作成
     # ============================
 
-    # 1. [一覧] の表示
-    print("\n[一覧]")
+    output_lines = []
+    output_lines.append(f"予約対象日: {TARGET_DATES}")
+    output_lines.append(f"環境判定: {ENV}")
+
+    # 1. [一覧]
+    output_lines.append("\n[一覧]")
     dates_str = ", ".join([f"'{d}'" for d in TARGET_DATES])
-    print(f"日付: {dates_str}")
+    output_lines.append(f"日付: {dates_str}")
     for room in room_order:
         statuses_list = [room_data.get(room, {}).get(d, "-") for d in TARGET_DATES]
-        print(f"{room}: {','.join(statuses_list)}")
+        output_lines.append(f"{room}: {','.join(statuses_list)}")
 
-    # 2. [日付ごと] の集計
-    print("\n[日付ごと]")
-    date_availability = {} # date: [available_rooms...]
+    # 2. [日付ごと]
+    output_lines.append("\n[日付ごと]")
+    date_availability = {}
     for d in TARGET_DATES:
         available_rooms = []
         for room in room_order:
@@ -302,12 +301,12 @@ def main():
         date_availability[d] = available_rooms
 
         if available_rooms:
-            print(f"{d}: 空室あり ({', '.join(available_rooms)})")
+            output_lines.append(f"{d}: 空室あり ({', '.join(available_rooms)})")
         else:
-            print(f"{d}: 空室なし")
+            output_lines.append(f"{d}: 空室なし")
 
-    # 3. [通知] の判定と実行
-    print("\n[通知]")
+    # 3. [通知]
+    output_lines.append("\n[通知]")
     notification_logs = []
 
     for d in TARGET_DATES:
@@ -315,22 +314,27 @@ def main():
         for room in available_rooms:
             status = room_data.get(room, {}).get(d)
             if should_notify(room, d, status, state):
-                # 新規通知
                 msg = f"{room} の {d} が空いてる ({status})"
                 notify_pushover(msg)
                 notification_logs.append(f"{d} {room}: 通知あり (新規のため通知)")
             else:
-                # 通知済み
                 notification_logs.append(f"{d} {room}: 通知なし (通知済み)")
 
-            # ステートを更新
             update_state(room, d, status, state)
 
     if notification_logs:
         for log in notification_logs:
-            print(log)
+            output_lines.append(log)
     else:
-        print("新規の通知対象はありませんでした。")
+        output_lines.append("新規の通知対象はありませんでした。")
+
+    # コンソール出力
+    result_text = "\n".join(output_lines)
+    print(result_text)
+
+    # latest-result.txt に保存
+    with open("latest-result.txt", "w", encoding="utf-8") as f:
+        f.write(result_text + "\n")
 
 
 if __name__ == "__main__":

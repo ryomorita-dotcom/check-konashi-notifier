@@ -39,8 +39,8 @@ jobs:
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
-            # state.json は常にコミット対象にする
-            git add state.json
+            # state.json と最新結果のテキストは常にコミット対象にする
+            git add state.json latest-result.txt
             
             # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
             SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")
@@ -49,12 +49,12 @@ jobs:
               echo "save_debug_html is true. Including debug HTML files in commit."
               # debug_html フォルダ内のタイムスタンプ付きHTMLファイルをステージングに追加
               git add debug_html/*_week*.html 2>/dev/null || true
-              COMMIT_MSG="Update state and debug html [skip ci]"
+              COMMIT_MSG="Update state, result text, and debug html [skip ci]"
             else
               echo "save_debug_html is false. Cleaning up any debug HTML files."
               git checkout -- debug_html/*_week*.html 2>/dev/null || true
               rm -rf debug_html 2>/dev/null || true
-              COMMIT_MSG="Update state.json [skip ci]"
+              COMMIT_MSG="Update state.json and latest-result.txt [skip ci]"
             fi
             
             # 変更がある場合のみコミットしてプッシュする
