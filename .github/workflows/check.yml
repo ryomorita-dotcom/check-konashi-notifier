@@ -41,6 +41,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # 自動生成されるHTMLファイルの変更は破棄して、state.json だけを対象にする
+          git checkout -- week_*.html 2>/dev/null || true
           git add state.json
           # 変更がある場合のみコミットしてプッシュする
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update state.json [skip ci]" && git push)
