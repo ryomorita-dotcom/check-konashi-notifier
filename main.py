@@ -204,8 +204,12 @@ def main():
 
             date_index = {d: i for i, d in enumerate(dates)}
 
-            # デバッグ用HTMLの出力 ({実行日時}_week{X}.html)
-            debug_filename = f"{execution_time_str}_week{week}.html"
+            # デバッグ用HTMLを保存する専用フォルダの作成
+            debug_dir = "debug_html"
+            os.makedirs(debug_dir, exist_ok=True)
+
+            # デバッグ用HTMLの出力 (debug_html/{実行日時}_week{X}.html)
+            debug_filename = os.path.join(debug_dir, f"{execution_time_str}_week{week}.html")
             with open(debug_filename, "w", encoding="utf-8") as f:
                 f.write(page.content())
 

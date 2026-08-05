@@ -50,13 +50,13 @@ jobs:
           
           if [ "$SAVE_HTML" = "True" ]; then
             echo "save_debug_html is true. Including debug HTML files in commit."
-            # タイムスタンプ付きのHTMLファイルをステージングに追加
-            git add *_week*.html 2>/dev/null || true
+            # debug_html フォルダ内のタイムスタンプ付きHTMLファイルをステージングに追加
+            git add debug_html/*_week*.html 2>/dev/null || true
             COMMIT_MSG="Update state and debug html [skip ci]"
           else
             echo "save_debug_html is false. Cleaning up any debug HTML files."
-            git checkout -- *_week*.html 2>/dev/null || true
-            rm -f *_week*.html 2>/dev/null || true
+            git checkout -- debug_html/*_week*.html 2>/dev/null || true
+            rm -rf debug_html 2>/dev/null || true
             COMMIT_MSG="Update state.json [skip ci]"
           fi
           
