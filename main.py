@@ -11,6 +11,7 @@ TARGET_URL = "https://d-reserve.jp/calendar?hotelCode=0000001660&sortKeyOrder=0&
 
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
+PUSHOVER_URL = os.getenv("PUSHOVER_URL", "") # GitHub PagesのURL
 
 
 # ============================
@@ -38,7 +39,7 @@ ENV = get_environment()
 
 
 # ============================
-#  通知
+#  通知 (URLリンク対応)
 # ============================
 
 def notify_pushover(message: str):
@@ -46,14 +47,17 @@ def notify_pushover(message: str):
         print("Pushover の環境変数が設定されていません (.env or GitHub Secrets を確認)")
         return
 
-    requests.post(
-        "https://api.pushover.net/1/messages.json",
-        data={
-            "token": PUSHOVER_TOKEN,
-            "user": PUSHOVER_USER,
-            "message": message,
-        }
-    )
+    payload = {
+        "token": PUSHOVER_TOKEN,
+        "user": PUSHOVER_USER,
+        "message": message,
+    }
+    
+    if PUSHOVER_URL:
+        payload["url"] = PUSHOVER_URL
+        payload["url_title"] = "最新の空室状況をブラウザで確認する"
+
+    requests.post("https://api.pushover.net/1/messages.json", data=payload)
 
 
 # ============================
@@ -89,9 +93,6 @@ def save_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 def clean_state(state, target_dates):
-    """
-    config.json の target_dates に含まれない古い日付のデータを state から削除する
-    """
     cleaned = {}
     for room, dates_dict in state.items():
         cleaned_room_dict = {}
@@ -159,6 +160,187 @@ def get_target_dates_week_indices(target_dates, base_date):
 
 
 # ============================
+#  HTML生成関数
+# ============================
+
+def generate_html_report(target_dates, room_order, room_data, date_availability, notification_logs):
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    dates_meta = ", ".join(target_dates)
+
+    th_dates_html = "".join([f"<th>{d}</th>" for d in target_dates])
+    
+    rows_html = ""
+    for room in room_order:
+        cells_html = f'<td class="room-name">{room}</td>'
+        for d in target_dates:
+            status = room_data.get(room, {}).get(d, "-")
+            if status == "〇":
+                css_class = "status-maru"
+            elif status == "△":
+                css_class = "status-sankaku"
+            elif status == "×":
+                css_class = "status-batsu"
+            else:
+                css_class = "status-dash"
+            cells_html += f'<td><span class="{css_class}">{status}</span></td>'
+        rows_html += f"<tr>{cells_html}</tr>\n"
+
+    date_rows_html = ""
+    for d in target_dates:
+        available_rooms = date_availability.get(d, [])
+        if available_rooms:
+            status_text = '<span class="status-sankaku">空室あり</span>'
+            room_text = f"<strong>{', '.join(available_rooms)}</strong>"
+            date_cell_style = f"<strong>{d}</strong>"
+        else:
+            status_text = '<span class="status-batsu">空室なし</span>'
+            room_text = "-"
+            date_cell_style = d
+        
+        date_rows_html += f"""
+            <tr>
+                <td>{date_cell_style}</td>
+                <td>{status_text}</td>
+                <td>{room_text}</td>
+            </tr>
+        """
+
+    logs_li = ""
+    if notification_logs:
+        for log in notification_logs:
+            logs_li += f"<li>{log}</li>\n"
+    else:
+        logs_li = "<li>新規の通知対象はありませんでした。</li>"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>予約空室チェッカー 結果</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 15px;
+            color: #333;
+            background-color: #f9f9f9;
+            display: inline-block;
+        }}
+        h1 {{
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }}
+        .meta {{
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 15px;
+        }}
+        table {{
+            width: auto;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        th, td {{
+            border: 1px solid #e1e4e8;
+            padding: 6px 12px;
+            text-align: center;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }}
+        th {{
+            background-color: #f1f8ff;
+            font-weight: 600;
+        }}
+        td.room-name {{
+            text-align: left;
+            font-weight: 500;
+            background-color: #fcfcfc;
+        }}
+        .status-maru {{
+            color: #d73a49;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }}
+        .status-sankaku {{
+            color: #e36209;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }}
+        .status-batsu {{
+            color: #6a737d;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }}
+        .status-dash {{
+            color: #dfe2e5;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }}
+        .section-title {{
+            font-size: 1rem;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 3px;
+            font-weight: bold;
+        }}
+        ul {{
+            padding-left: 20px;
+            font-size: 0.85rem;
+            margin: 5px 0;
+        }}
+        li {{
+            margin-bottom: 3px;
+        }}
+    </style>
+</head>
+<body>
+
+    <h1>キャンプ場 予約空室状況</h1>
+    <div class="meta">
+        <strong>最終更新:</strong> {now_str} / 
+        <strong>対象日:</strong> {dates_meta}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ルーム名 \\ 日付</th>
+                {th_dates_html}
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+
+    <div class="section-title">📅 日付ごとの空室状況</div>
+    <table>
+        <thead>
+            <tr>
+                <th>日付</th>
+                <th>状態</th>
+                <th>空室ルーム</th>
+            </tr>
+        </thead>
+        <tbody>
+            {date_rows_html}
+        </tbody>
+    </table>
+
+    <div class="section-title">🔔 通知ログ</div>
+    <ul>
+        {logs_li}
+    </ul>
+
+</body>
+</html>
+"""
+    return html_content
+
+
+# ============================
 #  main
 # ============================
 
@@ -167,14 +349,12 @@ def main():
     TARGET_DATES = config["target_dates"]
     save_debug_html = config.get("save_debug_html", False)
 
-    # state の読み込みと不要な日付のクレンジング
     state = load_state()
     state = clean_state(state, TARGET_DATES)
     save_state(state)
 
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
-    # ルームごとのデータを収集する辞書
     room_data = {}
     room_order = []
 
@@ -232,7 +412,6 @@ def main():
 
             date_index = {d: i for i, d in enumerate(dates)}
 
-            # デバッグ用HTML保存
             debug_dir = "debug_html"
             os.makedirs(debug_dir, exist_ok=True)
             debug_filename = os.path.join(debug_dir, f"{execution_time_str}_week{week}.html")
@@ -273,24 +452,6 @@ def main():
 
         browser.close()
 
-    # ============================
-    #  集計・判定・通知・出力文字列の作成
-    # ============================
-
-    output_lines = []
-    output_lines.append(f"予約対象日: {TARGET_DATES}")
-    output_lines.append(f"環境判定: {ENV}")
-
-    # 1. [一覧]
-    output_lines.append("\n[一覧]")
-    dates_str = ", ".join([f"'{d}'" for d in TARGET_DATES])
-    output_lines.append(f"日付: {dates_str}")
-    for room in room_order:
-        statuses_list = [room_data.get(room, {}).get(d, "-") for d in TARGET_DATES]
-        output_lines.append(f"{room}: {','.join(statuses_list)}")
-
-    # 2. [日付ごと]
-    output_lines.append("\n[日付ごと]")
     date_availability = {}
     for d in TARGET_DATES:
         available_rooms = []
@@ -300,13 +461,6 @@ def main():
                 available_rooms.append(room)
         date_availability[d] = available_rooms
 
-        if available_rooms:
-            output_lines.append(f"{d}: 空室あり ({', '.join(available_rooms)})")
-        else:
-            output_lines.append(f"{d}: 空室なし")
-
-    # 3. [通知]
-    output_lines.append("\n[通知]")
     notification_logs = []
 
     for d in TARGET_DATES:
@@ -322,19 +476,26 @@ def main():
 
             update_state(room, d, status, state)
 
-    if notification_logs:
-        for log in notification_logs:
-            output_lines.append(log)
-    else:
-        output_lines.append("新規の通知対象はありませんでした。")
+    if not notification_logs:
+        notification_logs.append("新規の通知対象はありませんでした。")
 
-    # コンソール出力
-    result_text = "\n".join(output_lines)
-    print(result_text)
+    output_lines = [f"予約対象日: {TARGET_DATES}", f"環境判定: {ENV}"]
+    output_lines.append("\n[一覧]")
+    dates_joined = ", ".join([f"'{d}'" for d in TARGET_DATES])
+    output_lines.append(f"日付: {dates_joined}")
+    for room in room_order:
+        statuses_list = [room_data.get(room, {}).get(d, "-") for d in TARGET_DATES]
+        output_lines.append(f"{room}: {','.join(statuses_list)}")
+    
+    print("\n".join(output_lines))
 
-    # latest-result.txt に保存
     with open("latest-result.txt", "w", encoding="utf-8") as f:
-        f.write(result_text + "\n")
+        f.write("\n".join(output_lines) + "\n")
+
+    html_report = generate_html_report(TARGET_DATES, room_order, room_data, date_availability, notification_logs)
+    with open("latest-result.html", "w", encoding="utf-8") as f:
+        f.write(html_report)
+    print("\n------> latest-result.html を生成しました。")
 
 
 if __name__ == "__main__":
