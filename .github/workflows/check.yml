@@ -41,8 +41,24 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          # 自動生成されるHTMLファイルの変更は破棄して、state.json だけを対象にする
-          git checkout -- week_*.html 2>/dev/null || true
+          
+          # state.json は常にコミット対象にする
           git add state.json
+          
+          # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
+          SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")
+          
+          if [ "$SAVE_HTML" = "True" ]; then
+            echo "save_debug_html is true. Including debug HTML files in commit."
+            # タイムスタンプ付きのHTMLファイルをステージングに追加
+            git add *_week*.html 2>/dev/null || true
+            COMMIT_MSG="Update state and debug html [skip ci]"
+          else
+            echo "save_debug_html is false. Cleaning up any debug HTML files."
+            git checkout -- *_week*.html 2>/dev/null || true
+            rm -f *_week*.html 2>/dev/null || true
+            COMMIT_MSG="Update state.json [skip ci]"
+          fi
+          
           # 変更がある場合のみコミットしてプッシュする
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update state.json [skip ci]" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "$COMMIT_MSG" && git push)
