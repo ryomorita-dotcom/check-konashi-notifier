@@ -519,13 +519,10 @@ def main():
     
     print("\n".join(output_lines))
 
-    with open("latest-result.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(output_lines) + "\n")
-
     html_report = generate_html_report(TARGET_DATES, room_order, room_data, date_availability, notification_logs)
-    with open("latest-result.html", "w", encoding="utf-8") as f:
+    with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_report)
-    print("\n------> latest-result.html を生成しました。")
+    print("\n------> index.html を生成しました。")
 
 
 if __name__ == "__main__":
