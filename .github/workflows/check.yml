@@ -51,12 +51,12 @@ jobs:
               echo "save_debug_html is true. Including debug HTML files in commit."
               # debug_html フォルダ内のタイムスタンプ付きHTMLファイルをステージングに追加
               git add debug_html/*_week*.html 2>/dev/null || true
-              COMMIT_MSG="Update state, index.html, and debug html [skip ci]"
+              COMMIT_MSG="Update state, index.html, and debug html"
             else
               echo "save_debug_html is false. Cleaning up any debug HTML files."
               git checkout -- debug_html/*_week*.html 2>/dev/null || true
               rm -rf debug_html 2>/dev/null || true
-              COMMIT_MSG="Update state.json and index.html [skip ci]"
+              COMMIT_MSG="Update state.json and index.html"
             fi
             
             # 変更がある場合のみコミットしてプッシュする
