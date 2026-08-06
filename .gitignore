@@ -4,7 +4,6 @@ venv/
 
 __pycache__/
 *.pyc
-latest-result.html
-latest-result.txt
-state.json
 latest-result.*
+state.json
+index.html

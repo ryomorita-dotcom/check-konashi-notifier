@@ -40,16 +40,9 @@ jobs:
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
-            # .gitignore に latest-result.html が確実に含まれているか確認・保証する
-            if ! grep -q "latest-result.html" .gitignore; then
-              echo "latest-result.html" >> .gitignore
-            fi
-            
-            # state.jsonと最新結果のテキストをコミット対象にする
-            git add -f state.json latest-result.txt
-            
-            # .gitignore に入っていても latest-result.html は強制的にコミット・公開対象に含める
-            git add -f latest-result.html
+            # state.json を通常追加し、index.html は .gitignore を無視して強制追加する
+            git add state.json
+            git add -f index.html
             
             # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
             SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")
@@ -58,12 +51,12 @@ jobs:
               echo "save_debug_html is true. Including debug HTML files in commit."
               # debug_html フォルダ内のタイムスタンプ付きHTMLファイルをステージングに追加
               git add debug_html/*_week*.html 2>/dev/null || true
-              COMMIT_MSG="Update state, result files, and debug html [skip ci]"
+              COMMIT_MSG="Update state, index.html, and debug html [skip ci]"
             else
               echo "save_debug_html is false. Cleaning up any debug HTML files."
               git checkout -- debug_html/*_week*.html 2>/dev/null || true
               rm -rf debug_html 2>/dev/null || true
-              COMMIT_MSG="Update state.json, latest-result.txt, and latest-result.html [skip ci]"
+              COMMIT_MSG="Update state.json and index.html [skip ci]"
             fi
             
             # 変更がある場合のみコミットしてプッシュする
