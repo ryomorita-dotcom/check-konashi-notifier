@@ -46,7 +46,7 @@ jobs:
             fi
             
             # state.jsonと最新結果のテキストをコミット対象にする
-            git add state.json latest-result.txt
+            git add -f state.json latest-result.txt
             
             # .gitignore に入っていても latest-result.html は強制的にコミット・公開対象に含める
             git add -f latest-result.html
