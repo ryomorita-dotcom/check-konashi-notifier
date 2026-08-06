@@ -11,7 +11,6 @@ TARGET_URL = "https://d-reserve.jp/calendar?hotelCode=0000001660&sortKeyOrder=0&
 
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
-PUSHOVER_URL = os.getenv("PUSHOVER_URL", "") # GitHub PagesのURL
 
 
 # ============================
@@ -42,7 +41,7 @@ ENV = get_environment()
 #  通知 (URLリンク対応)
 # ============================
 
-def notify_pushover(message: str):
+def notify_pushover(message: str, pushover_url: str = ""):
     if not PUSHOVER_TOKEN or not PUSHOVER_USER:
         print("Pushover の環境変数が設定されていません (.env or GitHub Secrets を確認)")
         return
@@ -53,8 +52,8 @@ def notify_pushover(message: str):
         "message": message,
     }
     
-    if PUSHOVER_URL:
-        payload["url"] = PUSHOVER_URL
+    if pushover_url:
+        payload["url"] = pushover_url
         payload["url_title"] = "最新の空室状況をブラウザで確認する"
 
     requests.post("https://api.pushover.net/1/messages.json", data=payload)
@@ -378,6 +377,7 @@ def main():
     config = load_config()
     TARGET_DATES = config["target_dates"]
     save_debug_html = config.get("save_debug_html", False)
+    pushover_url = config.get("pushover_url", "")
 
     state = load_state()
     state = clean_state(state, TARGET_DATES)
@@ -499,7 +499,7 @@ def main():
             status = room_data.get(room, {}).get(d)
             if should_notify(room, d, status, state):
                 msg = f"{room} の {d} が空いてる ({status})"
-                notify_pushover(msg)
+                notify_pushover(msg, pushover_url)
                 notification_logs.append(f"{d} {room}: 通知あり (新規のため通知)")
             else:
                 notification_logs.append(f"{d} {room}: 通知なし (通知済み)")
