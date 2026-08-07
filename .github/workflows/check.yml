@@ -9,6 +9,7 @@ jobs:
       timeout-minutes: 10 # 万が一のハングアップを防ぐため、最大10分で強制終了
       permissions:
         contents: write # Gitのコミットとプッシュを行うために必要
+        actions:  write # ワークフローのステータス参照や自身をキャンセルするために必要
       steps:
         - name: Guard against concurrent runs (Keep older, cancel newer)
           env:
