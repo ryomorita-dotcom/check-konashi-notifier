@@ -69,5 +69,9 @@ jobs:
               COMMIT_MSG="Update state.json and index.html"
             fi
             
-            # 変更がある場合のみコミットしてプッシュする
-            git diff --quiet && git diff --staged --quiet || (git commit -m "$COMMIT_MSG" && git push)
+            # 変更がある場合のみ、リモートの最新を取り込んでからコミット＆プッシュする
+            git diff --quiet && git diff --staged --quiet || (
+              git pull --rebase origin main
+              git commit -m "$COMMIT_MSG"
+              git push
+            )
