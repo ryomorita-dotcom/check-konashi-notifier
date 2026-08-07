@@ -107,24 +107,23 @@ def clean_state(state, target_dates):
 #  通知すべきか判定
 # ============================
 
-def should_notify(room, date, status, state):
-    prev = state.get(room, {}).get(date)
-    is_available = status in ["〇", "△"]
+def should_notify(room, date, current_status, state):
+    prev_status = state.get(room, {}).get(date)
+    is_current_available = current_status in ["〇", "△"]
 
-    if prev in ["〇", "△"] and is_available:
+    # 今回が空室ではない場合は絶対に通知しない
+    if not is_current_available:
         return False
 
-    if prev in ["×", "―", None] and is_available:
+    # 前回が空室（〇または△）だった場合は、すでに通知済み/空室継続なので通知しない
+    if prev_status in ["〇", "△"]:
+        return False
+
+    # 前回が満室（×）、未設定（―）、または記録なし（None / 初回・config追加時）で、今回空室になった場合は通知する！
+    if prev_status in ["×", "―", None]:
         return True
 
     return False
-
-
-def update_state(room, date, status, state):
-    if room not in state:
-        state[room] = {}
-    state[room][date] = status
-    save_state(state)
 
 
 # ============================
@@ -163,7 +162,6 @@ def get_target_dates_week_indices(target_dates, base_date):
 # ============================
 
 def generate_html_report(target_dates, room_order, room_data, date_availability, notification_logs):
-    # JST（UTC+9）の現在時刻を取得
     JST = timezone(timedelta(hours=9))
     now_str = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     dates_meta = ", ".join(target_dates)
@@ -225,7 +223,7 @@ def generate_html_report(target_dates, room_order, room_data, date_availability,
             color: #333;
             background-color: #f9f9f9;
             display: inline-block;
-            zoom: 1.2; /* 全体を約120%に拡大 */
+            zoom: 1.2;
         }}
         h1 {{
             font-size: 1.3rem;
@@ -381,7 +379,6 @@ def main():
 
     state = load_state()
     state = clean_state(state, TARGET_DATES)
-    save_state(state)
 
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
@@ -493,18 +490,30 @@ def main():
 
     notification_logs = []
 
-    for d in TARGET_DATES:
-        available_rooms = date_availability.get(d, [])
-        for room in available_rooms:
-            status = room_data.get(room, {}).get(d)
-            if should_notify(room, d, status, state):
-                msg = f"{room} の {d} が空いてる ({status})"
+    # 全ての部屋・対象日のステータスを評価し、state を全件更新する
+    for room in room_order:
+        if room not in state:
+            state[room] = {}
+        for d in TARGET_DATES:
+            current_status = room_data.get(room, {}).get(d, "-")
+            
+            # 通知すべきタイミングか判定
+            if should_notify(room, d, current_status, state):
+                msg = f"{room} の {d} が空いてる ({current_status})"
                 notify_pushover(msg, pushover_url)
-                notification_logs.append(f"{d} {room}: 通知あり (新規のため通知)")
+                notification_logs.append(f"{d} {room}: 通知あり (新規空室検知: {current_status})")
             else:
-                notification_logs.append(f"{d} {room}: 通知なし (通知済み)")
+                prev_status = state.get(room, {}).get(d)
+                if current_status in ["〇", "△"]:
+                    notification_logs.append(f"{d} {room}: 通知なし (空室継続中)")
+                else:
+                    notification_logs.append(f"{d} {room}: 通知なし (満室/対象外)")
 
-            update_state(room, d, status, state)
+            # 今回取得した最新ステータスで状態を上書き保存用に更新
+            state[room][d] = current_status
+
+    # 最終的な全状態を state.json に保存
+    save_state(state)
 
     if not notification_logs:
         notification_logs.append("新規の通知対象はありませんでした。")
