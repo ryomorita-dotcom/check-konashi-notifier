@@ -382,6 +382,11 @@ def main():
 
     execution_time_str = datetime.now().strftime("%Y%m%dT%H%M%S")
 
+    # ログ出力用のJST現在日時を取得（検知日時: MM/DD, HH:MM）
+    JST = timezone(timedelta(hours=9))
+    now_jst = datetime.now(JST)
+    current_datetime_str = now_jst.strftime("%m/%d, %H:%M")
+
     room_data = {}
     room_order = []
 
@@ -497,26 +502,18 @@ def main():
         for d in TARGET_DATES:
             current_status = room_data.get(room, {}).get(d, "-")
             
-            # 通知すべきタイミングか判定
+            # 通知すべきタイミングか判定（満室/未定義 → 空室への遷移のみ）
             if should_notify(room, d, current_status, state):
                 msg = f"{room} の {d} が空いてる ({current_status})"
                 notify_pushover(msg, pushover_url)
-                notification_logs.append(f"{d} {room}: 通知あり (新規空室検知: {current_status})")
-            else:
-                prev_status = state.get(room, {}).get(d)
-                if current_status in ["〇", "△"]:
-                    notification_logs.append(f"{d} {room}: 通知なし (空室継続中)")
-                else:
-                    notification_logs.append(f"{d} {room}: 通知なし (満室/対象外)")
+                # 💡 [検知日時] 対象日 MM/DD に空きあり (ルーム名: 新規空室検知 (ステータスに変化)) に修正
+                notification_logs.append(f"[{current_datetime_str}] 対象日 {d} に空きあり ({room}: 新規空室検知 ({current_status} に変化))")
 
             # 今回取得した最新ステータスで状態を上書き保存用に更新
             state[room][d] = current_status
 
     # 最終的な全状態を state.json に保存
     save_state(state)
-
-    if not notification_logs:
-        notification_logs.append("新規の通知対象はありませんでした。")
 
     output_lines = [f"予約対象日: {TARGET_DATES}", f"環境判定: {ENV}"]
     output_lines.append("\n[一覧]")
