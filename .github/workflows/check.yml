@@ -6,78 +6,99 @@ on:
 jobs:
     run-checker:
       runs-on: ubuntu-latest
+      timeout-minutes: 10 # 💡 万が一のハングアップを防ぐため、最大10分で強制終了
       permissions:
         contents: write # Gitのコミットとプッシュを行うために必要
       steps:
+        - name: Guard against concurrent runs (Keep older, cancel newer)
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            # 自分以外の同じワークフローで、現在「実行中(in_progress)」のランナーが存在するか確認する
+            CURRENT_RUN_ID="${{ github.run_id }}"
+            WORKFLOW_FILE="check.yml"
+            
+            # 実行中の他のRUN IDを取得（自分自身は除外）
+            OTHER_RUNS=$(gh api repos/${{ github.repository }}/actions/workflows/$WORKFLOW_FILE/runs?status=in_progress \
+              --jq ".workflow_runs[] | select(.id != $CURRENT_RUN_ID) | .id" 2>/dev/null || echo "")
+            
+            if [ -n "$OTHER_RUNS" ]; then
+              echo "⚠️ Another run is already in progress. Canceling this new run ($CURRENT_RUN_ID) to protect the active one..."
+              gh api -X POST repos/${{ github.repository }}/actions/runs/$CURRENT_RUN_ID/cancel
+              exit 0
+            else
+              echo "✅ No other runs in progress. Proceeding with this run."
+            fi
+
         - name: Checkout repository
-          uses: actions/checkout@v4
+          uses: actions/checkout@v4[cite: 1]
 
         - name: Set up Python
-          uses: actions/setup-python@v5
+          uses: actions/setup-python@v5[cite: 1]
           with:
-            python-version: '3.10'
+            python-version: '3.10'[cite: 1]
 
         - name: Cache pip and Playwright browsers
-          uses: actions/cache@v4
+          uses: actions/cache@v4[cite: 1]
           with:
-            path: |
-              ~/.cache/pip
-              ~/.cache/ms-playwright
-            key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
-            restore-keys: |
-              ${{ runner.os }}-playwright-
+            path: |[cite: 1]
+              ~/.cache/pip[cite: 1]
+              ~/.cache/ms-playwright[cite: 1]
+            key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}[cite: 1]
+            restore-keys: |[cite: 1]
+              ${{ runner.os }}-playwright-[cite: 1]
 
         - name: Install dependencies
-          run: |
-            python -m pip install --upgrade pip
-            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-            pip install playwright
+          run: |[cite: 1]
+            python -m pip install --upgrade pip[cite: 1]
+            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi[cite: 1]
+            pip install playwright[cite: 1]
             
-            # キャッシュが効いている（フォルダが存在する）場合は重いフルインストールをスキップする
-            # ※注意: チルダ(~)展開を確実に効かせるため $HOME を使う
-            if [ ! -d "$HOME/.cache/ms-playwright" ]; then
-              echo "Playwright cache not found. Running full install with deps..."
-              playwright install --with-deps chromium
-            else
-              echo "Playwright browsers already cached. Skipping full install."
+            # キャッシュが効いている（フォルダが存在する）場合は重いフルインストールをスキップする[cite: 1]
+            # ※注意: チルダ(~)展開を確実に効かせるため $HOME を使う[cite: 1]
+            if [ ! -d "$HOME/.cache/ms-playwright" ]; then[cite: 1]
+              echo "Playwright cache not found. Running full install with deps..."[cite: 1]
+              playwright install --with-deps chromium[cite: 1]
+            else[cite: 1]
+              echo "Playwright browsers already cached. Skipping full install."[cite: 1]
             fi
 
         - name: Run reservation checker
-          env:
-            PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_API_TOKEN }}
-            PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
-            PUSHOVER_URL: ${{ secrets.PUSHOVER_URL }}
-          run: |
-            python main.py
+          env:[cite: 1]
+            PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_API_TOKEN }}[cite: 1]
+            PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}[cite: 1]
+            PUSHOVER_URL: ${{ secrets.PUSHOVER_URL }}[cite: 1]
+          run: |[cite: 1]
+            python main.py[cite: 1]
 
         - name: Commit and push state changes
-          run: |
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          run: |[cite: 1]
+            git config --global user.name "github-actions[bot]"[cite: 1]
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"[cite: 1]
             
-            # まずリモートの最新変更を安全に取り込む（競合を防ぐ）
-            git pull --rebase origin main || true
+            # まずリモートの最新変更を安全に取り込む（競合を防ぐ）[cite: 1]
+            git pull --rebase origin main || true[cite: 1]
             
-            # state.json を通常追加し、index.html は .gitignore を無視して強制追加する
-            git add state.json
-            git add -f index.html
+            # state.json を通常追加し、index.html は .gitignore を無視して強制追加する[cite: 1]
+            git add state.json[cite: 1]
+            git add -f index.html[cite: 1]
             
-            # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
-            SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")
+            # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する[cite: 1]
+            SAVE_HTML=$(python3 -c "import json; print(json.load(open('config.json', 'r', encoding='utf-8')).get('save_debug_html', False))")[cite: 1]
             
-            if [ "$SAVE_HTML" = "True" ]; then
-              echo "save_debug_html is true. Including debug HTML files in commit."
-              git add debug_html/*_week*.html 2>/dev/null || true
-              COMMIT_MSG="Update state, index.html, and debug html"
-            else
-              echo "save_debug_html is false. Cleaning up any debug HTML files."
-              git checkout -- debug_html/*_week*.html 2>/dev/null || true
-              rm -rf debug_html 2>/dev/null || true
-              COMMIT_MSG="Update state.json and index.html"
-            fi
+            if [ "$SAVE_HTML" = "True" ]; then[cite: 1]
+              echo "save_debug_html is true. Including debug HTML files in commit."[cite: 1]
+              git add debug_html/*_week*.html 2>/dev/null || true[cite: 1]
+              COMMIT_MSG="Update state, index.html, and debug html"[cite: 1]
+            else[cite: 1]
+              echo "save_debug_html is false. Cleaning up any debug HTML files."[cite: 1]
+              git checkout -- debug_html/*_week*.html 2>/dev/null || true[cite: 1]
+              rm -rf debug_html 2>/dev/null || true[cite: 1]
+              COMMIT_MSG="Update state.json and index.html"[cite: 1]
+            fi[cite: 1]
             
-            # 変更がある場合のみコミットして、--force-with-lease で安全にプッシュする
-            git diff --quiet && git diff --staged --quiet || (
-              git commit -m "$COMMIT_MSG"
-              git push --force-with-lease origin main
+            # 変更がある場合のみコミットして、--force-with-lease で安全にプッシュする[cite: 1]
+            git diff --quiet && git diff --staged --quiet || ([cite: 1]
+              git commit -m "$COMMIT_MSG"[cite: 1]
+              git push --force-with-lease origin main[cite: 1]
             )
