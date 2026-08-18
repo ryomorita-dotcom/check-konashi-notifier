@@ -200,27 +200,57 @@ def apply_ci_to_url(base_url: str, ci_param: str) -> str:
 #  HTML生成関数 (template.html 読み込み型)
 # ============================
 
-def get_short_facility_name(full_name: str) -> str:
-    if "（" in full_name:
-        return full_name.split("（")[0]
-    if "(" in full_name:
-        return full_name.split("(")[0]
-    return full_name[:4]
+def get_day_info(date_str: str):
+    """日付文字列 (例: '9/19') から曜日・祝日を判定し、(CSSクラス, 曜日文字列) を返す"""
+    current_year = datetime.now().year
+    m, d = map(int, date_str.split("/"))
+    dt = datetime(current_year, m, d)
+    
+    days_jp = ["(月)", "(火)", "(水)", "(木)", "(金)", "(土)", "(日)"]
+    weekday_str = days_jp[dt.weekday()]
+    
+    # 日本の祝日（必要に応じて追加・調整してください）
+    holidays_2026 = [
+        "2026-09-21", # 敬老の日
+        "2026-09-23", # 秋分の日
+        "2026-09-22", # 国民の休日など
+    ]
+    
+    dt_str = dt.strftime("%Y-%m-%d")
+    weekday = dt.weekday()
+
+    if dt_str in holidays_2026 or weekday == 6:
+        return "sun-hol", weekday_str  # 休日・日曜 (赤)
+    elif weekday == 5:
+        return "sat", weekday_str      # 土曜 (青)
+    else:
+        return "weekday", weekday_str  # 平日 (黒)
 
 def generate_html_report(target_dates, facilities_data, notification_logs, pushover_url):
     JST = timezone(timedelta(hours=9))
     now_str = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     dates_meta = ", ".join(target_dates)
 
-    th_dates_html = "".join([f"<th>{d}</th>" for d in target_dates])
+    # ルーム別一覧のヘッダー（改行なし: 9/19 (土) 形式）
+    th_dates_html = ""
+    for d in target_dates:
+        css_cls, weekday_str = get_day_info(d)
+        th_dates_html += f'<th class="{css_cls}">{d} {weekday_str}</th>'
     
     all_rows_html = ""
     for fac in facilities_data:
         name = fac["name"]
+        direct_url = fac["direct_url"]
         room_order = fac["room_order"]
         room_data = fac["room_data"]
 
-        all_rows_html += f'<tr class="facility-header-row"><td colspan="{len(target_dates) + 1}">🏨 {name}</td></tr>\n'
+        all_rows_html += f'''
+            <tr class="facility-header-row">
+                <td colspan="{len(target_dates) + 1}">
+                    🏨 <a href="{direct_url}" target="_blank" class="facility-link">{name} <span class="external-icon">&#x2197;</span></a>
+                </td>
+            </tr>
+        '''
 
         for room in room_order:
             cells_html = f'<td class="room-name">{room}</td>'
@@ -237,11 +267,14 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
                 cells_html += f'<td><span class="{css_class}">{status}</span></td>'
             all_rows_html += f"<tr>{cells_html}</tr>\n"
 
+    # 日付ごとのまとめテーブル（こちらも曜日と色を適用）
     date_rows_html = ""
     for d in target_dates:
+        css_cls, weekday_str = get_day_info(d)
+        
         available_rooms_with_fac = []
         for fac in facilities_data:
-            short_name = get_short_facility_name(fac["name"])
+            short_name = fac["name"].split("（")[0] if "（" in fac["name"] else fac["name"][:4]
             for room in fac["room_order"]:
                 status = fac["room_data"].get(room, {}).get(d, "-")
                 if status in ["〇", "△"]:
@@ -250,28 +283,16 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
         if available_rooms_with_fac:
             status_text = '<span class="status-sankaku">空室あり</span>'
             room_text = f"<strong>{', '.join(available_rooms_with_fac)}</strong>"
-            date_cell_style = f"<strong>{d}</strong>"
         else:
             status_text = '<span class="status-batsu">空室なし</span>'
             room_text = "-"
-            date_cell_style = d
         
         date_rows_html += f"""
             <tr>
-                <td>{date_cell_style}</td>
+                <td><span class="{css_cls}"><strong>{d} {weekday_str}</strong></span></td>
                 <td>{status_text}</td>
                 <td>{room_text}</td>
             </tr>
-        """
-
-    buttons_html = ""
-    for fac in facilities_data:
-        buttons_html += f"""
-            <div>
-                <a href="{fac['direct_url']}" target="_blank" class="btn-reserve">
-                    🏕️ {fac['name']} の公式予約ページを開く
-                </a>
-            </div>
         """
 
     logs_li = ""
@@ -281,7 +302,6 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
     else:
         logs_li = "<li>新規の通知対象はありませんでした。</li>"
 
-    # 外部の template.html からレイアウトを読み込んで値を埋め込む
     with open("template.html", "r", encoding="utf-8") as f:
         template = f.read()
 
@@ -291,7 +311,6 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
         th_dates_html=th_dates_html,
         all_rows_html=all_rows_html,
         date_rows_html=date_rows_html,
-        buttons_html=buttons_html,
         logs_li=logs_li
     )
 

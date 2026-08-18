@@ -39,6 +39,11 @@
             background-color: #f1f8ff;
             font-weight: 600;
         }}
+        /* 曜日・祝日の色分け */
+        .weekday {{ color: #333; }}
+        .sat {{ color: #0066cc; }}       /* 土曜日：青 */
+        .sun-hol {{ color: #d73a49; }}  /* 日曜・祝日：赤 */
+
         td.room-name {{
             text-align: left;
             font-weight: 500;
@@ -51,6 +56,18 @@
             text-align: left;
             font-size: 0.95rem;
             padding: 6px 12px;
+        }}
+        .facility-link {{
+            color: #0366d6;
+            text-decoration: none;
+        }}
+        .facility-link:hover {{
+            text-decoration: underline;
+        }}
+        .external-icon {{
+            font-size: 0.85rem;
+            display: inline-block;
+            margin-left: 2px;
         }}
         .status-maru {{
             color: #d73a49;
@@ -88,29 +105,6 @@
         li {{
             margin-bottom: 3px;
         }}
-        .action-container {{
-            margin-top: 15px;
-            margin-bottom: 15px;
-            text-align: left;
-        }}
-        .action-container div {{
-            margin-bottom: 8px;
-        }}
-        .btn-reserve {{
-            display: inline-block;
-            background-color: #0366d6;
-            color: #ffffff;
-            padding: 8px 16px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            text-decoration: none;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-            transition: background-color 0.2s;
-        }}
-        .btn-reserve:hover {{
-            background-color: #0056b3;
-        }}
     </style>
 </head>
 <body>
@@ -147,11 +141,6 @@
             {date_rows_html}
         </tbody>
     </table>
-
-    <div class="section-title">🛖 施設ごとの公式予約ページ</div>
-    <div class="action-container">
-        {buttons_html}
-    </div>
 
     <hr style="border:0; border-top:1px solid #ddd; margin:30px 0;">
 
