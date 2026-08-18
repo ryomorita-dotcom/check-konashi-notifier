@@ -76,10 +76,6 @@ jobs:
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
-            # 予期せぬ未追跡ファイルや変更による rebase 失敗を防ぐためクリーンアップ
-            git checkout .
-            git clean -fd
-            
             # まずリモートの最新変更を安全に取り込む（競合を防ぐ）
             git pull --rebase origin main || true
             
@@ -96,7 +92,6 @@ jobs:
               COMMIT_MSG="Update state, index.html, and debug html"
             else
               echo "save_debug_html is false. Cleaning up any debug HTML files."
-              git checkout -- debug_html/*_week*.html 2>/dev/null || true
               rm -rf debug_html 2>/dev/null || true
               COMMIT_MSG="Update state.json and index.html"
             fi
