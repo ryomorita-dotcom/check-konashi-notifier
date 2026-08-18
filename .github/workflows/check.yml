@@ -76,11 +76,15 @@ jobs:
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
+            # 予期せぬ未追跡ファイルや変更による rebase 失敗を防ぐためクリーンアップ
+            git checkout .
+            git clean -fd
+            
             # まずリモートの最新変更を安全に取り込む（競合を防ぐ）
             git pull --rebase origin main || true
             
-            # state.json を通常追加し、index.html は .gitignore を無視して強制追加する
-            git add state.json
+            # state.json と index.html は .gitignore を無視して強制追加する
+            git add -f state.json
             git add -f index.html
             
             # Pythonを使って config.json から save_debug_html の値 (True/False) を取得する
