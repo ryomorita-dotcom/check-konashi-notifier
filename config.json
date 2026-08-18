@@ -1,5 +1,5 @@
 {
-  "target_dates": ["8/20", "9/12", "9/19", "9/20", "9/21", "9/22", "10/3"],
+  "target_dates": ["9/19", "9/20", "9/21", "9/22"],
   "test_mode": true,
   "save_debug_html": false,
   "pushover_url": "https://dreserve-notifier.pages.dev/",
