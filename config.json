@@ -1,16 +1,18 @@
 {
-  "target_dates": ["9/19", "9/20", "9/21", "9/22"],
+  "target_dates": ["8/20", "9/12", "9/19", "9/20", "9/21", "9/22", "10/3"],
   "test_mode": true,
   "save_debug_html": false,
-  "pushover_url": "https://check-konashi-notifier.pages.dev/",
+  "pushover_url": "https://dreserve-notifier.pages.dev/",
   "facilities": [
     {
       "name": "小梨平（上高地キャンプ場 ケビン）",
-      "url": "https://d-reserve.jp/calendar?hotelCode=0000001660&sortKeyOrder=0&lt001=0_7_8_9&lnum001=2_0_0_0"
+      "url": "https://d-reserve.jp/calendar?hotelCode=0000001660&sortKeyOrder=0&lt001=0_7_8_9&lnum001=2_0_0_0",
+      "exclude_keywords": ["持参テント"]
     },
     {
       "name": "みくりが池温泉（室堂 温泉山荘）",
-      "url": "https://d-reserve.jp/calendar?hotelCode=0000001203&sortKeyOrder=0&lt001=0_1_2_3_4&lnum001=1_0_0_0_0"
+      "url": "https://d-reserve.jp/calendar?hotelCode=0000001203&lt001=0_1_2_3_4&lnum001=4_0_0_0_0",
+      "exclude_keywords": ["相部屋"]
     }
   ]
 }
