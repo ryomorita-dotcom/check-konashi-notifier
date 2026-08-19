@@ -156,9 +156,13 @@ def get_day_info(date_str: str):
   weekday_str = days_jp[dt.weekday()]
 
   holidays_2026 = [
-      "2026-09-21",  # 敬老の日
-      "2026-09-23",  # 秋分の日
-      "2026-09-22",  # 国民の休日など
+    "2026-08-11",  # 山の日
+    "2026-09-21",  # 敬老の日
+    "2026-09-22",  # 国民の休日
+    "2026-09-23",  # 秋分の日
+    "2026-10-12",  # スポーツの日
+    "2026-11-03",  # 文化の日
+    "2026-11-23",  # 勤労感謝の日
   ]
 
   dt_str = dt.strftime("%Y-%m-%d")
@@ -220,13 +224,13 @@ def generate_html_report(
 
     available_rooms_with_fac = []
     for fac in facilities_data:
-      short_name = (
-          fac["name"].split("（")[0] if "（" in fac["name"] else fac["name"][:4]
-      )
+      # name をそのまま取得して前後にカッコを付与
+      short_name = f"({fac['name']})"
+
       for room in fac["room_order"]:
         status = fac["room_data"].get(room, {}).get(d, "-")
         if status in ["〇", "△"]:
-          available_rooms_with_fac.append(f"({short_name}) {room}")
+          available_rooms_with_fac.append(f"{short_name} {room}")
 
     if available_rooms_with_fac:
       status_text = '<span class="status-sankaku">空室あり</span>'

@@ -10,7 +10,7 @@
   "pushover_url": "https://dreserve-notifier.pages.dev/",
   "facilities": [
     {
-      "name": "上高地: 小梨平キャンプ場 (ケビン）",
+      "name": "上高地: 小梨平キャンプ場",
       "type": "dreserve",
       "url": "https://d-reserve.jp/calendar?hotelCode=0000001660&sortKeyOrder=0&lt001=0_7_8_9&lnum001=2_0_0_0",
       "exclude_keywords": [
@@ -18,7 +18,7 @@
       ]
     },
     {
-      "name": "室堂: みくりが池温泉（温泉山小屋）",
+      "name": "室堂: みくりが池温泉",
       "type": "dreserve",
       "url": "https://d-reserve.jp/calendar?hotelCode=0000001203&lt001=0_1_2_3_4&lnum001=4_0_0_0_0",
       "exclude_keywords": [
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "name": "室堂: 雷鳥荘 (温泉山小屋)",
+      "name": "室堂: 雷鳥荘",
       "type": "tenawan",
       "url": "https://www.tenawan.ne.jp/lodgment/rec/007/602/pcpl.asp",
       "exclude_keywords": [
