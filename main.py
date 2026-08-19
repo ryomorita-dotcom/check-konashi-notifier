@@ -1,15 +1,22 @@
 import os
 import json
 import requests
-import re
 from datetime import datetime, timedelta, timezone
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
+
+# モジュール群のインポート
+from scrapers import dreserve
 
 load_dotenv()
 
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
+
+# スクレイパーのマッピング
+SCRAPER_MAP = {
+    "dreserve": dreserve,
+}
 
 
 # ============================
@@ -131,72 +138,6 @@ def should_notify(facility_state, room, date, current_status):
 
 
 # ============================
-#  日付処理・URL生成 (スマートグループ化対応)
-# ============================
-
-def parse_date_text(raw: str) -> str:
-    raw = raw.strip()
-    if "\n" in raw:
-        raw = raw.split("\n")[0]
-    out = ""
-    for ch in raw:
-        if ch.isdigit() or ch == "/":
-            out += ch
-        else:
-            break
-    return out
-
-def get_week_groups(target_dates: list) -> dict:
-    if not target_dates:
-        return {}
-
-    current_year = datetime.now().year
-    
-    dt_list = []
-    for d_str in target_dates:
-        m, d = map(int, d_str.split("/"))
-        dt = datetime(current_year, m, d)
-        if dt < datetime.now() - timedelta(days=30):
-            dt = datetime(current_year + 1, m, d)
-        dt_list.append((dt, d_str))
-    
-    dt_list.sort(key=lambda x: x[0])
-
-    groups = {}
-    current_group_dates = []
-    group_anchor_dt = None
-
-    for dt, d_str in dt_list:
-        if not current_group_dates:
-            current_group_dates.append(d_str)
-            group_anchor_dt = dt
-        else:
-            if (dt - group_anchor_dt).days <= 6:
-                current_group_dates.append(d_str)
-            else:
-                ci_dt = group_anchor_dt + timedelta(days=3)
-                ci_param = ci_dt.strftime("%Y%m%d")
-                groups[ci_param] = current_group_dates
-                
-                current_group_dates = [d_str]
-                group_anchor_dt = dt
-
-    if current_group_dates and group_anchor_dt:
-        ci_dt = group_anchor_dt + timedelta(days=3)
-        ci_param = ci_dt.strftime("%Y%m%d")
-        groups[ci_param] = current_group_dates
-
-    return groups
-
-def apply_ci_to_url(base_url: str, ci_param: str) -> str:
-    if "ci=" in base_url:
-        return re.sub(r'ci=\d+', f'ci={ci_param}', base_url)
-    else:
-        separator = "&" if "?" in base_url else "?"
-        return f"{base_url}{separator}ci={ci_param}"
-
-
-# ============================
 #  HTML生成関数 (template.html 読み込み型)
 # ============================
 
@@ -209,7 +150,7 @@ def get_day_info(date_str: str):
     days_jp = ["(月)", "(火)", "(水)", "(木)", "(金)", "(土)", "(日)"]
     weekday_str = days_jp[dt.weekday()]
     
-    # 日本の祝日（必要に応じて追加・調整してください）
+    # 日本の祝日
     holidays_2026 = [
         "2026-09-21", # 敬老の日
         "2026-09-23", # 秋分の日
@@ -231,7 +172,6 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
     now_str = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     dates_meta = ", ".join(target_dates)
 
-    # ルーム別一覧のヘッダー（改行なし: 9/19 (土) 形式）
     th_dates_html = ""
     for d in target_dates:
         css_cls, weekday_str = get_day_info(d)
@@ -267,7 +207,6 @@ def generate_html_report(target_dates, facilities_data, notification_logs, pusho
                 cells_html += f'<td><span class="{css_class}">{status}</span></td>'
             all_rows_html += f"<tr>{cells_html}</tr>\n"
 
-    # 日付ごとのまとめテーブル（こちらも曜日と色を適用）
     date_rows_html = ""
     for d in target_dates:
         css_cls, weekday_str = get_day_info(d)
@@ -337,8 +276,6 @@ def main():
     now_jst = datetime.now(JST)
     current_datetime_str = now_jst.strftime("%m/%d, %H:%M")
 
-    week_groups = get_week_groups(TARGET_DATES)
-
     notification_logs = []
     facilities_data = []
 
@@ -350,78 +287,26 @@ def main():
         
         for fac_idx, facility in enumerate(facilities):
             fac_name = facility["name"]
-            raw_url = facility["url"]
-            exclude_keywords = facility.get("exclude_keywords", [])
+            fac_type = facility.get("type", "dreserve") # 指定がなければdreserve
             
-            room_data = {}
-            room_order = []
+            scraper = SCRAPER_MAP.get(fac_type)
+            if not scraper:
+                print(f"エラー: 未知の施設タイプです ({fac_type}) -> 施設名: {fac_name}")
+                continue
             
-            print(f"対象施設: {fac_name}")
+            # 各スクレイパーモジュールに処理を委譲
+            scraped_result = scraper.scrape(
+                browser=browser,
+                facility=facility,
+                target_dates=TARGET_DATES,
+                save_debug_html=save_debug_html,
+                execution_time_str=execution_time_str,
+                fac_idx=fac_idx
+            )
             
-            for group_idx, (ci_param, dates_in_week) in enumerate(week_groups.items(), 1):
-                current_url = apply_ci_to_url(raw_url, ci_param)
-                
-                group_range_str = f"{dates_in_week[0]}~{dates_in_week[-1]}" if len(dates_in_week) > 1 else dates_in_week[0]
-
-                page = browser.new_page(viewport={"width": 1920, "height": 1080})
-                page.goto(current_url, wait_until="domcontentloaded")
-
-                try:
-                    page.wait_for_selector(
-                        "div.calendarBody_date_PC_inner p.calendarBody_date_PC_item",
-                        timeout=5000
-                    )
-                except:
-                    pass
-
-                date_nodes = page.locator("div.calendarBody_date_PC_inner p.calendarBody_date_PC_item")
-                raw_dates = [node.inner_text() for node in date_nodes.all()]
-                dates = [parse_date_text(d) for d in raw_dates]
-
-                date_index = {d: i for i, d in enumerate(dates)}
-
-                debug_dir = "debug_html"
-                os.makedirs(debug_dir, exist_ok=True)
-                debug_filename = os.path.join(debug_dir, f"{execution_time_str}_fac{fac_idx}_ci{ci_param}.html")
-                with open(debug_filename, "w", encoding="utf-8") as f:
-                    f.write(page.content())
-                if not save_debug_html and os.path.exists(debug_filename):
-                    os.remove(debug_filename)
-
-                rows = page.locator("div.calendarBody_roomList")
-
-                for i in range(rows.count()):
-                    row = rows.nth(i)
-                    name = row.locator("p.calendarBody_room_name a").inner_text().strip()
-                    
-                    should_skip = False
-                    for kw in exclude_keywords:
-                        if kw in name:
-                            should_skip = True
-                            break
-                    if should_skip:
-                        continue
-
-                    if name not in room_order:
-                        room_order.append(name)
-                    if name not in room_data:
-                        room_data[name] = {}
-
-                    status_cells = row.locator("div.calendarBody_vacancy_date")
-                    statuses = [
-                        status_cells.nth(j).locator("span.calendarBody_vacancy_salesStatus").inner_text().strip()
-                        for j in range(status_cells.count())
-                    ]
-
-                    for target_date in dates_in_week:
-                        idx = date_index.get(target_date)
-                        if idx is not None and idx < len(statuses):
-                            room_data[name][target_date] = statuses[idx]
-
-                page.close()
-                print(f"--> 取得グループ{group_idx} ({group_range_str}) : 完了")
-
-            print("") 
+            room_order = scraped_result["room_order"]
+            room_data = scraped_result["room_data"]
+            direct_url = scraped_result["direct_url"]
 
             date_availability = {}
             for d in TARGET_DATES:
@@ -448,11 +333,9 @@ def main():
 
                     state[fac_name][room][d] = current_status
 
-            default_button_url = apply_ci_to_url(raw_url, list(week_groups.keys())[0])
-
             facilities_data.append({
                 "name": fac_name,
-                "direct_url": default_button_url,
+                "direct_url": direct_url,
                 "room_order": room_order,
                 "room_data": room_data,
                 "date_availability": date_availability
